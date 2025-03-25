@@ -1,0 +1,90 @@
+import requests
+import validators
+import re
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+
+# List of known phishing keywords and suspicious domains
+PHISHING_KEYWORDS = ["login", "verify", "update", "security", "bank", "account"]
+SUSPICIOUS_DOMAINS = ["bit.ly", "tinyurl.com", "goo.gl", "is.gd"]
+
+def is_suspicious_domain(url):
+    """Check if URL contains suspicious domain or shortening service."""
+    domain = urlparse(url).netloc
+    for suspicious_domain in SUSPICIOUS_DOMAINS:
+        if suspicious_domain in domain:
+            return True
+    return False
+
+def contains_phishing_keywords(url):
+    """Check if URL contains phishing keywords in path."""
+    for keyword in PHISHING_KEYWORDS:
+        if keyword in url.lower():
+            return True
+    return False
+
+def check_https(url):
+    """Ensure that the URL uses HTTPS."""
+    if not url.startswith("https://"):
+        return False
+    return True
+
+def validate_url(url):
+    """Check if the URL is valid."""
+    if validators.url(url):
+        return True
+    return False
+
+def check_page_for_phishing(url):
+    """Check the webpage content for phishing signs."""
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            print("Failed to retrieve the webpage.")
+            return False
+        
+        # Parse the page
+        soup = BeautifulSoup(response.content, "html.parser")
+        
+        # Check if the page asks for sensitive information (basic check)
+        sensitive_keywords = ["password", "social security", "credit card", "login", "account"]
+        for keyword in sensitive_keywords:
+            if keyword.lower() in soup.get_text().lower():
+                return True
+        return False
+    except Exception as e:
+        print(f"Error checking page: {e}")
+        return False
+
+def scan_phishing_link(url):
+    """Scan URL to detect phishing signs."""
+    print(f"Scanning URL: {url}")
+    
+    # Step 1: Check if the URL is valid
+    if not validate_url(url):
+        return "Invalid URL"
+
+    # Step 2: Check for HTTPS usage
+    if not check_https(url):
+        print("Warning: URL does not use HTTPS.")
+    
+    # Step 3: Check if it contains suspicious domain
+    if is_suspicious_domain(url):
+        print("Warning: URL contains a suspicious domain (shortened URL).")
+    
+    # Step 4: Check for phishing keywords in the URL
+    if contains_phishing_keywords(url):
+        print("Warning: URL contains phishing keywords.")
+    
+    # Step 5: Check the content of the webpage for phishing signs
+    if check_page_for_phishing(url):
+        print("Warning: This webpage may be phishing (asks for sensitive information).")
+        return "Potential Phishing Detected!"
+    
+    return "No phishing detected. The link seems safe."
+
+# Example use case
+if __name__ == "__main__":
+    url = input("Enter the URL to check: ")
+    result = scan_phishing_link(url)
+    print(result)
